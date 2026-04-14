@@ -1,0 +1,13 @@
+spring:
+  application:
+    name: chatji
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=1000,expireAfterWrite=10m
+
+naver:
+  openapi:
+    client-id: ${NAVER_CLIENT_ID:YOUR_CLIENT_ID}
+    client-secret: ${NAVER_CLIENT_SECRET:YOUR_CLIENT_SECRET}
+    url: https://openapi.naver.com/v1/search/shop.json
