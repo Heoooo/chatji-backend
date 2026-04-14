@@ -1,6 +1,8 @@
 spring:
   application:
     name: chatji
+  config:
+    import: optional:classpath:application-secret.yml
   cache:
     type: caffeine
     caffeine:
