@@ -18,12 +18,15 @@ public class ProductService {
 
     private final NaverShoppingClient naverClient;
 
-    @Cacheable(value = "search", key = "#keyword + ':' + #sort")
-    public List<ProductResponse> searchProducts(String keyword, String sort) {
-        log.info("외부 API를 호출합니다. Keyword: {}, Sort: {}", keyword, sort);
+    @Cacheable(value = "search", key = "#keyword + ':' + #sort + ':' + #start")
+    public List<ProductResponse> searchProducts(String keyword, String sort, int start) {
+        log.info("외부 API를 호출합니다. Keyword: {}, Sort: {}, Start: {}", keyword, sort, start);
 
-        String apiSort = "price_asc".equals(sort) ? "asc" : "dsc";
-        NaverProductDto resultDto = naverClient.search(keyword, apiSort);
+        String apiSort = "sim";
+        if ("price_asc".equals(sort)) apiSort = "asc";
+        else if ("price_dsc".equals(sort)) apiSort = "dsc";
+
+        NaverProductDto resultDto = naverClient.search(keyword, apiSort, start);
 
         if (resultDto == null || resultDto.items() == null) {
             return Collections.emptyList();

@@ -18,9 +18,10 @@ public class ProductController {
     @GetMapping
     public ResponseEntity<List<ProductService.ProductResponse>> searchProducts(
             @RequestParam String keyword,
-            @RequestParam(defaultValue = "price_asc") String sort) {
+            @RequestParam(defaultValue = "sim") String sort,
+            @RequestParam(defaultValue = "1") int start) {
 
-        List<ProductService.ProductResponse> results = productService.searchProducts(keyword, sort);
+        List<ProductService.ProductResponse> results = productService.searchProducts(keyword, sort, start);
         return ResponseEntity.ok(results);
     }
 }

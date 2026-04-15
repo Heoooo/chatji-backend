@@ -21,11 +21,12 @@ public class NaverShoppingClient {
     }
 
     @Retryable(retryFor = { RestClientException.class }, maxAttempts = 2, backoff = @Backoff(delay = 1000))
-    public NaverProductDto search(String keyword, String sort) {
+    public NaverProductDto search(String keyword, String sort, int start) {
         return restClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .queryParam("query", keyword)
                         .queryParam("display", 20)
+                        .queryParam("start", start)
                         .queryParam("sort", sort)
                         .build())
                 .retrieve()
