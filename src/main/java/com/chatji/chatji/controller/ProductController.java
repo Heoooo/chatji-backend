@@ -20,9 +20,12 @@ public class ProductController {
     public ResponseEntity<List<ProductService.ProductResponse>> searchProducts(
             @RequestParam String keyword,
             @RequestParam(defaultValue = "sim") String sort,
-            @RequestParam(defaultValue = "1") int start) {
+            @RequestParam(defaultValue = "1") int start,
+            @RequestParam(required = false) Integer minPrice,
+            @RequestParam(required = false) Integer maxPrice) {
 
-        List<ProductService.ProductResponse> results = productService.searchProducts(keyword, sort, start);
+        List<ProductService.ProductResponse> results = productService.searchProducts(keyword, sort, start, minPrice,
+                maxPrice);
         return ResponseEntity.ok(results);
     }
 
