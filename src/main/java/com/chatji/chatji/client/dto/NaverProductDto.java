@@ -13,6 +13,10 @@ public record NaverProductDto(
             String image,
             int lprice,
             String mallName,
-            String productId) {
+            String productId,
+            String category1,
+            String category2,
+            String category3,
+            String category4) {
     }
 }

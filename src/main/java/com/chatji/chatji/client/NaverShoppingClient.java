@@ -26,7 +26,7 @@ public class NaverShoppingClient {
         return restClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .queryParam("query", keyword)
-                        .queryParam("display", 20)
+                        .queryParam("display", 100)
                         .queryParam("start", start)
                         .queryParam("sort", sort)
                         .queryParamIfPresent("lprice", Optional.ofNullable(minPrice))
