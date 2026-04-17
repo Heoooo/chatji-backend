@@ -57,7 +57,8 @@ public class ProductService {
                                     item.link(),
                                     item.image(),
                                     item.lprice(),
-                                    item.mallName()))
+                                    item.mallName(),
+                                    item.category1()))
                             .filter(p -> (minPrice == null || p.lprice() >= minPrice))
                             .filter(p -> (maxPrice == null || p.lprice() <= maxPrice))
                             .toList();
@@ -100,6 +101,6 @@ public class ProductService {
     }
 
     public record ProductResponse(
-            String productId, String title, String link, String image, Integer lprice, String mallName) {
+            String productId, String title, String link, String image, Integer lprice, String mallName, String category) {
     }
 }

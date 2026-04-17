@@ -25,14 +25,14 @@ import java.util.regex.Pattern;
 public class HotDealCrawlerService {
 
     private final HotDealRepository hotDealRepository;
-    private final PriceHistoryRepository priceHistoryRepository; // v27: 시세 히스토리 DB
+    private final PriceHistoryRepository priceHistoryRepository;
     private final ProductService productService;
     private final AlarmService alarmService;
 
     @Scheduled(fixedDelay = 300000, initialDelay = 1000)
     @Transactional
     public void crawlAllHotDeals() {
-        log.info("[v27-CRAWLER] Smart Analytics Engine Started (Price History & Scoring)");
+        log.info("[v28-CRAWLER] Intelligence Engine Active (Categorization & History)");
         crawlPomppu();
         crawlRuliweb();
     }
@@ -44,7 +44,7 @@ public class HotDealCrawlerService {
             Elements rows = doc.select("tr.list0, tr.list1");
             processRows(rows, "뽐뿌", "no=");
         } catch (Exception e) {
-            log.error("[v27] Pomppu Error: {}", e.getMessage());
+            log.error("[v28] Pomppu Error: {}", e.getMessage());
         }
     }
 
@@ -67,7 +67,7 @@ public class HotDealCrawlerService {
                 } catch (Exception e) { continue; }
             }
         } catch (Exception e) {
-            log.error("[v27] Ruliweb Error: {}", e.getMessage());
+            log.error("[v28] Ruliweb Error: {}", e.getMessage());
         }
     }
 
@@ -100,14 +100,15 @@ public class HotDealCrawlerService {
         List<ProductService.ProductResponse> naverResults = productService.searchProducts(keyword, "sim", 1, null, null);
         
         int discountRate = 0;
-        int score = 50; // v27: 기본 점수
+        int score = 50; 
+        String category = "기타"; // v28: 기본 카테고리 설정
 
         if (!naverResults.isEmpty()) {
             ProductService.ProductResponse bestMatch = naverResults.get(0);
             int naverLowestPrice = bestMatch.lprice();
             discountRate = (int) (((double)(naverLowestPrice - dealPrice) / naverLowestPrice) * 100);
+            category = bestMatch.category(); // v28: 검색 결과에서 카테고리 추출
 
-            // v27: 시세 히스토리 기록 (Snapshots)
             priceHistoryRepository.save(PriceHistory.builder()
                     .productId(bestMatch.productId())
                     .price(naverLowestPrice)
@@ -115,7 +116,6 @@ public class HotDealCrawlerService {
                     .timestamp(LocalDateTime.now())
                     .build());
 
-            // v27: 스마트 핫딜 점수 알고리즘 (할인율 기반 가점)
             score = Math.min(100, Math.max(0, 50 + (discountRate * 2)));
         }
 
@@ -126,7 +126,8 @@ public class HotDealCrawlerService {
                     .url(link)
                     .currentPrice(dealPrice)
                     .source(source)
-                    .score(score) // v27: 계산된 점수 반영
+                    .score(score)
+                    .category(category) // v28: 카테고리 정보와 함께 저장
                     .build();
 
             hotDealRepository.save(newDeal);
