@@ -23,6 +23,7 @@ public class HotDeal {
     private Integer currentPrice;
     private String mallName;
     private String source; // 뿜뿌, 루리웹 등 출처
+    private Integer score; // v27: 핫딜 점수 (0-100)
     
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();

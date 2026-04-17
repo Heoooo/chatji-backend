@@ -2,6 +2,8 @@ package com.chatji.chatji.service;
 
 import com.chatji.chatji.domain.hotdeal.HotDeal;
 import com.chatji.chatji.domain.hotdeal.HotDealRepository;
+import com.chatji.chatji.domain.price.PriceHistory;
+import com.chatji.chatji.domain.price.PriceHistoryRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Jsoup;
@@ -12,6 +14,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -22,13 +25,14 @@ import java.util.regex.Pattern;
 public class HotDealCrawlerService {
 
     private final HotDealRepository hotDealRepository;
+    private final PriceHistoryRepository priceHistoryRepository; // v27: 시세 히스토리 DB
     private final ProductService productService;
     private final AlarmService alarmService;
 
     @Scheduled(fixedDelay = 300000, initialDelay = 1000)
     @Transactional
     public void crawlAllHotDeals() {
-        log.info("[v26-CRAWLER] Multi-target Hunting Started (Pomppu & Ruliweb)");
+        log.info("[v27-CRAWLER] Smart Analytics Engine Started (Price History & Scoring)");
         crawlPomppu();
         crawlRuliweb();
     }
@@ -40,7 +44,7 @@ public class HotDealCrawlerService {
             Elements rows = doc.select("tr.list0, tr.list1");
             processRows(rows, "뽐뿌", "no=");
         } catch (Exception e) {
-            log.error("[v26] Pomppu Error: {}", e.getMessage());
+            log.error("[v27] Pomppu Error: {}", e.getMessage());
         }
     }
 
@@ -59,11 +63,11 @@ public class HotDealCrawlerService {
                     String originId = link.contains("read/") ? link.split("read/")[1].split("\\?")[0] : link;
 
                     processSingleDeal(title, link, originId, "루리웹");
-                    Thread.sleep(300); // 429 에러 방지용 (안전히 0.3초)
+                    Thread.sleep(350); 
                 } catch (Exception e) { continue; }
             }
         } catch (Exception e) {
-            log.error("[v26] Ruliweb Error: {}", e.getMessage());
+            log.error("[v27] Ruliweb Error: {}", e.getMessage());
         }
     }
 
@@ -81,7 +85,7 @@ public class HotDealCrawlerService {
                 String originId = link.contains(idParam) ? link.split(idParam)[1].split("&")[0] : link;
 
                 processSingleDeal(title, link, originId, source);
-                Thread.sleep(300); 
+                Thread.sleep(350); 
             } catch (Exception e) { continue; }
         }
     }
@@ -90,18 +94,31 @@ public class HotDealCrawlerService {
         if (hotDealRepository.findByOriginId(originId).isPresent()) return;
 
         Integer dealPrice = extractPrice(title);
-        if (dealPrice == null || dealPrice == 0) return; // 0원 딜은 수집하지 않음 (정확도 우선)
+        if (dealPrice == null || dealPrice == 0) return;
 
         String keyword = cleanKeyword(title);
         List<ProductService.ProductResponse> naverResults = productService.searchProducts(keyword, "sim", 1, null, null);
         
         int discountRate = 0;
+        int score = 50; // v27: 기본 점수
+
         if (!naverResults.isEmpty()) {
-            int naverLowestPrice = naverResults.get(0).lprice();
+            ProductService.ProductResponse bestMatch = naverResults.get(0);
+            int naverLowestPrice = bestMatch.lprice();
             discountRate = (int) (((double)(naverLowestPrice - dealPrice) / naverLowestPrice) * 100);
+
+            // v27: 시세 히스토리 기록 (Snapshots)
+            priceHistoryRepository.save(PriceHistory.builder()
+                    .productId(bestMatch.productId())
+                    .price(naverLowestPrice)
+                    .keyword(keyword)
+                    .timestamp(LocalDateTime.now())
+                    .build());
+
+            // v27: 스마트 핫딜 점수 알고리즘 (할인율 기반 가점)
+            score = Math.min(100, Math.max(0, 50 + (discountRate * 2)));
         }
 
-        // 진짜 핫딜(10% 이상 저렴)로 판명될 때만 저장
         if (discountRate >= 10) { 
             HotDeal newDeal = HotDeal.builder()
                     .originId(originId)
@@ -109,6 +126,7 @@ public class HotDealCrawlerService {
                     .url(link)
                     .currentPrice(dealPrice)
                     .source(source)
+                    .score(score) // v27: 계산된 점수 반영
                     .build();
 
             hotDealRepository.save(newDeal);
@@ -117,20 +135,15 @@ public class HotDealCrawlerService {
     }
 
     private Integer extractPrice(String title) {
-        // 모든 공백 제거 후 가격 패턴 분석
         String cleanTitle = title.replace(" ", "").replace(",", "");
-        
-        // 1. 숫자 + 원 (가장 일반적)
         Pattern p1 = Pattern.compile("(\\d{3,10})원");
         Matcher m1 = p1.matcher(cleanTitle);
         if (m1.find()) return Integer.parseInt(m1.group(1));
 
-        // 2. 괄호 안의 숫자 (루리웹 다수)
-        Pattern p2 = Pattern.compile("\\((\\d{4,10})");
+        Pattern p2 = Pattern.compile("\\(([\\d,]{4,10})");
         Matcher m2 = p2.matcher(cleanTitle);
         if (m2.find()) return Integer.parseInt(m2.group(1));
 
-        // 3. 상품명 끝의 가격 (뽐뿌 다수)
         Pattern p3 = Pattern.compile("/(\\d{4,10})");
         Matcher m3 = p3.matcher(cleanTitle);
         if (m3.find()) return Integer.parseInt(m3.group(1));
