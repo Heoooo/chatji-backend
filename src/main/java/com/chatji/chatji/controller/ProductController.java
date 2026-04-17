@@ -2,12 +2,14 @@ package com.chatji.chatji.controller;
 
 import com.chatji.chatji.service.ProductService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestClient;
 
 import java.util.List;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/products")
 @RequiredArgsConstructor
@@ -24,8 +26,12 @@ public class ProductController {
             @RequestParam(required = false) Integer minPrice,
             @RequestParam(required = false) Integer maxPrice) {
 
+        long startTime = System.currentTimeMillis();
         List<ProductService.ProductResponse> results = productService.searchProducts(keyword, sort, start, minPrice,
                 maxPrice);
+        long duration = System.currentTimeMillis() - startTime;
+        
+        log.info("[PROVE-CACHE] Total Response Time: {}ms", duration);
         return ResponseEntity.ok(results);
     }
 
