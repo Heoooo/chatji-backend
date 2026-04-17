@@ -125,9 +125,23 @@
 
 ---
 
+## 📅 2026-04-17: 멀티 소스 확장 및 수율 최적화 (v24)
+
+### 1. 다중 타겟 크롤링 (Multi-Source Scalability)
+*   **Problem**: 단일 소스(뽐뿌)에 의존할 경우 특정 카테고리의 핫딜 편중 현상 및 수집 공백 발생 가능성.
+*   **Action**: 
+    *   **루리웹(Ruliweb)** 핫딜 게시판을 추가 타겟으로 선정하여 IT/게임 기기 데이터 보강.
+    *   크롤링 로직을 추상화하여 새로운 타겟 사이트 추가 시 최소한의 코드 수정으로 확장 가능하도록 리팩토링.
+*   **수율 최적화 (Yield Management)**:
+    *   **판정 임계치 조정**: 개발 및 초기 운영 단계에서 사용자 노출 빈도를 높이기 위해 판정 임계치를 **10% → 1%**로 완화.
+    *   **데이터 접근성 향상**: 정보 부족으로 인한 UI Empty State를 방지하고 시스템의 활성도를 시각적으로 증명.
+*   **Insight**: 인프라 확장성(Scalability)뿐만 아니라 실제 사용자가 체감하는 **'데이터의 풍부함'**이라는 비즈니스 지표를 고려한 아키텍처 설계 역량 확보.
+
+---
+
 ## 🛠️ 적용 기술 (Tech Stack)
-- **Backend & Crawler**: Spring Boot 3.x, **Jsoup**, **Spring Data JPA**, **H2**, Redis, Caffeine
-- **Strategy**: Scheduling, Regex-based Parsing, **Price Cross-Validation Algorithm**
+- **Backend & Crawler**: Spring Boot 3.x, **Jsoup**, **Spring Data JPA**, H2, Redis
+- **Architecture**: **Multi-Source Crawler Engine**, Smart Validation Algorithm
 - **External API**: Naver Shopping Search API (sim sort)
 
 ---

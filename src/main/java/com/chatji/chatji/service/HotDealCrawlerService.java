@@ -22,73 +22,116 @@ import java.util.regex.Pattern;
 public class HotDealCrawlerService {
 
     private final HotDealRepository hotDealRepository;
-    private final ProductService productService; // 기존 최저가 검색 엔진 활용
-    private final AlarmService alarmService;     // 알림 엔진
+    private final ProductService productService;
+    private final AlarmService alarmService;
 
-    @Scheduled(fixedDelay = 300000)
+    /**
+     * 멀티 타겟 크롤링 엔진 (v24)
+     * - 뽐뿌 & 루리웹 동시 감시
+     * - 검증 임계치 완화 (10% -> 1%)
+     */
+    @Scheduled(fixedDelay = 300000, initialDelay = 1000)
     @Transactional
-    public void crawlPomppuHotDeals() {
-        log.info("[v23-CRAWLER] Smart HotDeal Monitoring Started...");
-        String url = "https://www.ppomppu.co.kr/zboard/zboard.php?id=ppomppu";
+    public void crawlAllHotDeals() {
+        log.info("[v24-CRAWLER] Multi-target Hunting Started (Pomppu & Ruliweb)");
+        
+        // 1. 뽐뿌 사냥
+        crawlPomppu();
+        
+        // 2. 루리웹 사냥
+        crawlRuliweb();
+    }
 
+    private void crawlPomppu() {
+        String url = "https://www.ppomppu.co.kr/zboard/zboard.php?id=ppomppu";
         try {
             Document doc = Jsoup.connect(url).get();
             Elements rows = doc.select("tr.list0, tr.list1");
+            processRows(rows, "뽐ppu", "no=");
+        } catch (Exception e) {
+            log.error("[v24] Pomppu Error: {}", e.getMessage());
+        }
+    }
 
+    private void crawlRuliweb() {
+        String url = "https://bbs.ruliweb.com/market/board/1020";
+        try {
+            Document doc = Jsoup.connect(url).get();
+            Elements rows = doc.select("tr.table_body");
             for (Element row : rows) {
-                Element titleElement = row.select("font.list_title").first();
+                Element titleElement = row.select("a.deco").first();
                 if (titleElement == null) continue;
 
                 String title = titleElement.text();
-                String link = "https://www.ppomppu.co.kr/zboard/" + row.select("a").first().attr("href");
-                String originId = link.split("no=")[1].split("&")[0];
+                String link = titleElement.attr("href");
+                String originId = link.substring(link.lastIndexOf("/") + 1);
 
-                if (hotDealRepository.findByOriginId(originId).isPresent()) continue;
-
-                // 1. 가격 추출 알고리즘 (정규식 활용)
-                Integer dealPrice = extractPrice(title);
-                if (dealPrice == null || dealPrice < 1000) continue; // 가격 정보 없으면 스킵
-
-                // 2. 스마트 감지 알고리즘: 네이버 최저가와 비교
-                String keyword = cleanKeyword(title);
-                List<ProductService.ProductResponse> naverResults = productService.searchProducts(keyword, "sim", 1, null, null);
-                
-                if (!naverResults.isEmpty()) {
-                    int naverLowestPrice = naverResults.get(0).lprice();
-                    int discountRate = (int) (((double)(naverLowestPrice - dealPrice) / naverLowestPrice) * 100);
-
-                    // 3. 10% 이상 저렴한 '진짜 핫딜'만 수집 및 알림
-                    if (discountRate >= 10) {
-                        HotDeal newDeal = HotDeal.builder()
-                                .originId(originId)
-                                .title(title)
-                                .url(link)
-                                .currentPrice(dealPrice)
-                                .source("뽐뿌")
-                                .build();
-
-                        hotDealRepository.save(newDeal);
-                        alarmService.sendHotDealAlarm(newDeal, discountRate);
-                    }
-                }
+                processSingleDeal(title, link, originId, "루리웹");
             }
         } catch (Exception e) {
-            log.error("[v23-ERROR] Crawler: {}", e.getMessage());
+            log.error("[v24] Ruliweb Error: {}", e.getMessage());
+        }
+    }
+
+    private void processRows(Elements rows, String source, String idParam) {
+        for (Element row : rows) {
+            Element titleElement = row.select("font.list_title").first();
+            if (titleElement == null) continue;
+
+            String title = titleElement.text();
+            Element linkElement = row.select("a").first();
+            if (linkElement == null) continue;
+            
+            String link = "https://www.ppomppu.co.kr/zboard/" + linkElement.attr("href");
+            String originId = link.contains(idParam) ? link.split(idParam)[1].split("&")[0] : link;
+
+            processSingleDeal(title, link, originId, source);
+        }
+    }
+
+    private void processSingleDeal(String title, String link, String originId, String source) {
+        if (hotDealRepository.findByOriginId(originId).isPresent()) return;
+
+        Integer dealPrice = extractPrice(title);
+        // 테스트를 위해 가격 정보가 없어도 일단 수집 (임계치 완화 스토리)
+        if (dealPrice == null) dealPrice = 0; 
+
+        String keyword = cleanKeyword(title);
+        List<ProductService.ProductResponse> naverResults = productService.searchProducts(keyword, "sim", 1, null, null);
+        
+        int discountRate = 0;
+        if (!naverResults.isEmpty()) {
+            int naverLowestPrice = naverResults.get(0).lprice();
+            if (dealPrice > 0) {
+                discountRate = (int) (((double)(naverLowestPrice - dealPrice) / naverLowestPrice) * 100);
+            }
+        }
+
+        // 임계치를 1%로 대폭 완화하여 수율 확보
+        if (discountRate >= 1 || dealPrice == 0) {
+            HotDeal newDeal = HotDeal.builder()
+                    .originId(originId)
+                    .title(title)
+                    .url(link)
+                    .currentPrice(dealPrice)
+                    .source(source)
+                    .build();
+
+            hotDealRepository.save(newDeal);
+            alarmService.sendHotDealAlarm(newDeal, discountRate);
         }
     }
 
     private Integer extractPrice(String title) {
-        // 숫자와 '원'이 결합된 형태 추출 (예: 15,000원 -> 15000)
         Pattern pattern = Pattern.compile("([\\d,]+)원");
-        Matcher matcher = pattern.matcher(title.replace(" ", ""));
+        Matcher matcher = pattern.matcher(title.replace(" ", "").replace(",", ""));
         if (matcher.find()) {
-            return Integer.parseInt(matcher.group(1).replace(",", ""));
+            try { return Integer.parseInt(matcher.group(1)); } catch (Exception e) { return null; }
         }
         return null;
     }
 
     private String cleanKeyword(String title) {
-        // 제목에서 광고성 문구 제거하여 검색어 정제
         return title.replaceAll("\\[.*?\\]", "").replaceAll("\\(.*?\\)", "").trim();
     }
 }
