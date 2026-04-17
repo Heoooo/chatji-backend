@@ -109,9 +109,25 @@
 
 ---
 
+## 📅 2026-04-17: 실시간 스마트 핫딜 엔진 및 알림 시스템 (v23)
+
+### 1. 커뮤니티 데이터 기반의 능동형 정보 수집 (Smart Crawling)
+*   **Problem**: 사용자가 매번 검색어를 입력해야만 정보를 얻을 수 있는 수동형 서비스의 한계. 수익화를 위한 능동적인 상품 노출 기회 부족.
+*   **Action**: 
+    *   **Jsoup**과 **Spring Scheduling**을 활용한 커뮤니티(뽐뿌 등) 핫딜 게시판 실시간 크롤링 파이프라인 구축.
+    *   **Regex(정규표현식)**를 통한 비정형 게시글 제목에서의 가격 정보 및 쇼핑몰명 정밀 추출.
+*   **Smart Detection Algorithm (Killer Feature)**:
+    *   **교차 검증**: 수집된 핫딜가를 기존에 구축한 '네이버 최저가 검색 엔진'과 실시간 대조.
+    *   **판계 임계치(10%)**: 네이버 최저가 대비 **10% 이상 저렴한 경우**에만 'True HotDeal'로 판정하여 시스템 데이터로 수용.
+*   **Benefit (Business Value)**:
+    *   단순 정보 나열이 아닌 **가공된 고가치 정보** 제공을 통해 사용자 체류 시간 및 제휴 링크 클릭률 향상 기대.
+    *   **이벤트 기반 알림** 구조 설계를 통해 향후 다양한 푸시 플랫폼(Slack, Kakao) 확장성 확보.
+
+---
+
 ## 🛠️ 적용 기술 (Tech Stack)
-- **Backend & Infrastructure**: Spring Boot 3.x, **Redis**, **Caffeine**, **Docker**, **Spring Profiles**
-- **Logic**: JSON Serialization, multi-TTL Policies, **Multi-Profile Cache Selection**
+- **Backend & Crawler**: Spring Boot 3.x, **Jsoup**, **Spring Data JPA**, **H2**, Redis, Caffeine
+- **Strategy**: Scheduling, Regex-based Parsing, **Price Cross-Validation Algorithm**
 - **External API**: Naver Shopping Search API (sim sort)
 
 ---
