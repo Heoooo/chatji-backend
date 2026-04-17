@@ -28,6 +28,7 @@ public class ProductService {
      * v20: 장애 격리(Circuit Breaker) 도입
      * - 네이버 API 장애 시 시스템 전파를 차단하고 Fallback 로직 실행
      */
+
     @Cacheable(value = "search_v17", key = "#keyword + ':' + #sort + ':' + #start + ':' + #minPrice + ':' + #maxPrice", sync = true)
     @CircuitBreaker(name = "productSearch", fallbackMethod = "fallbackSearch")
     public List<ProductResponse> searchProducts(String keyword, String sort, int start, Integer minPrice,

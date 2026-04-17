@@ -25,20 +25,11 @@ public class HotDealCrawlerService {
     private final ProductService productService;
     private final AlarmService alarmService;
 
-    /**
-     * 멀티 타겟 크롤링 엔진 (v24)
-     * - 뽐뿌 & 루리웹 동시 감시
-     * - 검증 임계치 완화 (10% -> 1%)
-     */
     @Scheduled(fixedDelay = 300000, initialDelay = 1000)
     @Transactional
     public void crawlAllHotDeals() {
-        log.info("[v24-CRAWLER] Multi-target Hunting Started (Pomppu & Ruliweb)");
-        
-        // 1. 뽐뿌 사냥
+        log.info("[v26-CRAWLER] Multi-target Hunting Started (Pomppu & Ruliweb)");
         crawlPomppu();
-        
-        // 2. 루리웹 사냥
         crawlRuliweb();
     }
 
@@ -47,9 +38,9 @@ public class HotDealCrawlerService {
         try {
             Document doc = Jsoup.connect(url).get();
             Elements rows = doc.select("tr.list0, tr.list1");
-            processRows(rows, "뽐ppu", "no=");
+            processRows(rows, "뽐뿌", "no=");
         } catch (Exception e) {
-            log.error("[v24] Pomppu Error: {}", e.getMessage());
+            log.error("[v26] Pomppu Error: {}", e.getMessage());
         }
     }
 
@@ -59,33 +50,39 @@ public class HotDealCrawlerService {
             Document doc = Jsoup.connect(url).get();
             Elements rows = doc.select("tr.table_body");
             for (Element row : rows) {
-                Element titleElement = row.select("a.deco").first();
-                if (titleElement == null) continue;
+                try {
+                    Element titleElement = row.select("a.deco").first();
+                    if (titleElement == null) continue;
 
-                String title = titleElement.text();
-                String link = titleElement.attr("href");
-                String originId = link.substring(link.lastIndexOf("/") + 1);
+                    String title = titleElement.text();
+                    String link = titleElement.attr("href");
+                    String originId = link.contains("read/") ? link.split("read/")[1].split("\\?")[0] : link;
 
-                processSingleDeal(title, link, originId, "루리웹");
+                    processSingleDeal(title, link, originId, "루리웹");
+                    Thread.sleep(300); // 429 에러 방지용 (안전히 0.3초)
+                } catch (Exception e) { continue; }
             }
         } catch (Exception e) {
-            log.error("[v24] Ruliweb Error: {}", e.getMessage());
+            log.error("[v26] Ruliweb Error: {}", e.getMessage());
         }
     }
 
     private void processRows(Elements rows, String source, String idParam) {
         for (Element row : rows) {
-            Element titleElement = row.select("font.list_title").first();
-            if (titleElement == null) continue;
+            try {
+                Element titleElement = row.select("font.list_title").first();
+                if (titleElement == null) continue;
 
-            String title = titleElement.text();
-            Element linkElement = row.select("a").first();
-            if (linkElement == null) continue;
-            
-            String link = "https://www.ppomppu.co.kr/zboard/" + linkElement.attr("href");
-            String originId = link.contains(idParam) ? link.split(idParam)[1].split("&")[0] : link;
+                String title = titleElement.text();
+                Element linkElement = row.select("a").first();
+                if (linkElement == null) continue;
+                
+                String link = "https://www.ppomppu.co.kr/zboard/" + linkElement.attr("href");
+                String originId = link.contains(idParam) ? link.split(idParam)[1].split("&")[0] : link;
 
-            processSingleDeal(title, link, originId, source);
+                processSingleDeal(title, link, originId, source);
+                Thread.sleep(300); 
+            } catch (Exception e) { continue; }
         }
     }
 
@@ -93,8 +90,7 @@ public class HotDealCrawlerService {
         if (hotDealRepository.findByOriginId(originId).isPresent()) return;
 
         Integer dealPrice = extractPrice(title);
-        // 테스트를 위해 가격 정보가 없어도 일단 수집 (임계치 완화 스토리)
-        if (dealPrice == null) dealPrice = 0; 
+        if (dealPrice == null || dealPrice == 0) return; // 0원 딜은 수집하지 않음 (정확도 우선)
 
         String keyword = cleanKeyword(title);
         List<ProductService.ProductResponse> naverResults = productService.searchProducts(keyword, "sim", 1, null, null);
@@ -102,13 +98,11 @@ public class HotDealCrawlerService {
         int discountRate = 0;
         if (!naverResults.isEmpty()) {
             int naverLowestPrice = naverResults.get(0).lprice();
-            if (dealPrice > 0) {
-                discountRate = (int) (((double)(naverLowestPrice - dealPrice) / naverLowestPrice) * 100);
-            }
+            discountRate = (int) (((double)(naverLowestPrice - dealPrice) / naverLowestPrice) * 100);
         }
 
-        // 임계치를 1%로 대폭 완화하여 수율 확보
-        if (discountRate >= 1 || dealPrice == 0) {
+        // 진짜 핫딜(10% 이상 저렴)로 판명될 때만 저장
+        if (discountRate >= 10) { 
             HotDeal newDeal = HotDeal.builder()
                     .originId(originId)
                     .title(title)
@@ -123,15 +117,32 @@ public class HotDealCrawlerService {
     }
 
     private Integer extractPrice(String title) {
-        Pattern pattern = Pattern.compile("([\\d,]+)원");
-        Matcher matcher = pattern.matcher(title.replace(" ", "").replace(",", ""));
-        if (matcher.find()) {
-            try { return Integer.parseInt(matcher.group(1)); } catch (Exception e) { return null; }
-        }
+        // 모든 공백 제거 후 가격 패턴 분석
+        String cleanTitle = title.replace(" ", "").replace(",", "");
+        
+        // 1. 숫자 + 원 (가장 일반적)
+        Pattern p1 = Pattern.compile("(\\d{3,10})원");
+        Matcher m1 = p1.matcher(cleanTitle);
+        if (m1.find()) return Integer.parseInt(m1.group(1));
+
+        // 2. 괄호 안의 숫자 (루리웹 다수)
+        Pattern p2 = Pattern.compile("\\((\\d{4,10})");
+        Matcher m2 = p2.matcher(cleanTitle);
+        if (m2.find()) return Integer.parseInt(m2.group(1));
+
+        // 3. 상품명 끝의 가격 (뽐뿌 다수)
+        Pattern p3 = Pattern.compile("/(\\d{4,10})");
+        Matcher m3 = p3.matcher(cleanTitle);
+        if (m3.find()) return Integer.parseInt(m3.group(1));
+
         return null;
     }
 
     private String cleanKeyword(String title) {
-        return title.replaceAll("\\[.*?\\]", "").replaceAll("\\(.*?\\)", "").trim();
+        return title.replaceAll("\\[.*?\\]", "")
+                    .replaceAll("\\(.*?\\)", "")
+                    .replaceAll("[\\d,]+원?", "")
+                    .replaceAll("/[\\d,]+", "")
+                    .trim();
     }
 }

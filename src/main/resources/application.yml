@@ -7,6 +7,9 @@ spring:
   # 기본 프로필: 로컬 (Caffeine 사용)
   profiles:
     active: local
+  jpa:
+    hibernate:
+      ddl-auto: update # 실전 모드: 데이터 유지
 
 # 공통 설정 (어떤 환경에서도 사용)
 naver:
@@ -19,11 +22,11 @@ resilience4j:
     instances:
       productSearch:
         registerHealthIndicator: true
-        slidingWindowSize: 10
+        slidingWindowSize: 20          # 20번의 호출을 기준으로 판단
         minimumNumberOfCalls: 5
-        failureRateThreshold: 50
-        waitDurationInOpenState: 10s
-        permittedNumberOfCallsInHalfOpenState: 3
+        failureRateThreshold: 80      # 80% 실패 시 회로 차단 (더 널널하게)
+        waitDurationInOpenState: 2s   # 2초 뒤에 다시 시도 (빠른 복구)
+        permittedNumberOfCallsInHalfOpenState: 5
         slidingWindowType: COUNT_BASED
 
 ---
