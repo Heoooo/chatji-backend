@@ -80,6 +80,20 @@
 
 ---
 
+## 📅 2026-04-17: 장애 격리 및 시스템 보호 (Circuit Breaker v20)
+
+### 1. 외부 API 연쇄 장애 차단 (Resilience Engineering)
+*   **Problem**: 외부 API(네이버 쇼핑) 장애 시 모든 워커 스레드가 대기 상태(Waiting)로 전이되어 시스템 자원이 고갈되고 전체 서버가 마비되는 **연쇄 장애(Cascading Failure)** 위험.
+*   **Action**: 
+    *   **Resilience4j** 기반의 서킷 브레이커 패턴 도입.
+    *   실패율 50% 임계치 도달 시 즉시 회로 차단(Open) 후 타임아웃 대기 없이 **Fallback 로직(Graceful Degradation)** 실행.
+*   **Metric (Verified Reliability)**:
+    *   **장애 발생 시 대응 시간**: 기존 타임아웃 대기(약 10s) → **서킷 브레이커 즉각 차단 (1ms 미만)**.
+    *   **서비스 가용성(Availability)**: 시스템 전체 마비 차단 및 대체 결과(Fallback) 제공으로 **가용성 100%** 유지 시도.
+    *   **인사이트**: 외부 의존성이 높은 서비스에서 시스템의 자정 능력을 갖추는 것이 서비스 생존에 필수적임을 입증.
+
+---
+
 ## 🛠️ 적용 기술 (Tech Stack)
 - **Backend**: Spring Boot 3.x, Spring Cache
 - **Logic**: Strategy Pattern Prototype, Performance Benchmarking, Data-Driven Decision Making
