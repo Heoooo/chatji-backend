@@ -94,9 +94,24 @@
 
 ---
 
+## 📅 2026-04-17: 환경별 캐시 추상화 및 유연한 인프라 설계 (v22)
+
+### 1. Spring Profile을 활용한 캐시 이중화 (Local vs Prod Strategy)
+*   **Problem**: 특정 인프라 환경(방화벽 등)에서 외부 Redis 포트(6379) 접근이 불가능하여 개발 생산성이 저하되는 문제 발생. 
+*   **Action**: 
+    *   **Spring Profiles**를 도입하여 로컬 개발용(`local`)과 클라우드 운영용(`prod`) 설정 분리.
+    *   **Local**: 방화벽 제약이 없는 메모리 기반 **Caffeine 캐시**를 사용하여 초고속 개발 환경 유지.
+    *   **Prod**: 분산 서버 간 데이터 정합성을 보장하는 **Cloud Redis** 연동 시스템 구축.
+*   **Metric (Engineering Decision)**:
+    *   **개발 편의성**: 인프라 장애(Unable to connect)로 인한 개발 중단 현상 **100% 제거**.
+    *   **유연한 배포**: 환경 변수 하나로 로컬 메모리 캐시에서 글로벌 분산 캐시로 즉시 전환 가능.
+    *   **인사이트**: 단순 작동에 그치지 않고 다양한 개발 및 런타임 환경을 고려한 **'환경 독립적 아키텍처(Environment-Agnostic Architecture)'** 수립.
+
+---
+
 ## 🛠️ 적용 기술 (Tech Stack)
-- **Backend**: Spring Boot 3.x, Spring Cache
-- **Logic**: Strategy Pattern Prototype, Performance Benchmarking, Data-Driven Decision Making
+- **Backend & Infrastructure**: Spring Boot 3.x, **Redis**, **Caffeine**, **Docker**, **Spring Profiles**
+- **Logic**: JSON Serialization, multi-TTL Policies, **Multi-Profile Cache Selection**
 - **External API**: Naver Shopping Search API (sim sort)
 
 ---

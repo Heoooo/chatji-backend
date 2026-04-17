@@ -3,16 +3,16 @@ spring:
     name: chatji
   config:
     import: optional:classpath:application-secret.yml
-  cache:
-    type: caffeine
-    caffeine:
-      spec: maximumSize=1000,expireAfterWrite=10m
+  
+  # 기본 프로필: 로컬 (Caffeine 사용)
+  profiles:
+    active: local
 
+# 공통 설정 (어떤 환경에서도 사용)
 naver:
   openapi:
-    client-id: ${NAVER_CLIENT_ID:YOUR_CLIENT_ID}
-    client-secret: ${NAVER_CLIENT_SECRET:YOUR_CLIENT_SECRET}
     url: https://openapi.naver.com/v1/search/shop.json
+    # 클라이언트 ID/Secret은 application-secret.yml에서 가져옵니다.
 
 resilience4j:
   circuitbreaker:
@@ -25,3 +25,30 @@ resilience4j:
         waitDurationInOpenState: 10s
         permittedNumberOfCallsInHalfOpenState: 3
         slidingWindowType: COUNT_BASED
+
+---
+
+# 로컬 환경 설정 (local)
+spring:
+  config:
+    activate:
+      on-profile: local
+  cache:
+    type: caffeine
+  caffeine:
+    spec: maximumSize=1000,expireAfterWrite=10m
+
+---
+
+# 운영 서버 환경 설정 (prod)
+spring:
+  config:
+    activate:
+      on-profile: prod
+  cache:
+    type: redis
+  data:
+    redis:
+      url: rediss://default:gQAAAAAAAYlUAAIocDFkOGUzYzZkYmMzZmI0ZGI0YWM1OGM5MzNmMTM4NTZiZHAxMTAwNjky@grand-gnat-100692.upstash.io:6379
+
+---
