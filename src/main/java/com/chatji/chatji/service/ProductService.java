@@ -32,7 +32,9 @@ public class ProductService {
             log.info("Expanded keywords for {}: {}", keyword, expandedKeywords);
 
             List<ProductResponse> totalPool = new java.util.ArrayList<>();
-            
+            int baseKeywordCount = 0;
+            boolean isFirst = true;
+
             // 2. 확장된 각 키워드별로 검색 수행
             for (String kw : expandedKeywords) {
                 NaverProductDto resultDto = naverClient.search(kw, "sim", 1, null, null);
@@ -54,6 +56,12 @@ public class ProductService {
                         .filter(p -> (maxPrice == null || p.lprice() <= maxPrice))
                         .toList();
                 
+                if (isFirst) {
+                    baseKeywordCount = filtered.size();
+                    isFirst = false;
+                    log.info("[v16-PROVE] Base keyword '{}' results: {}", kw, baseKeywordCount);
+                }
+                
                 totalPool.addAll(filtered);
             }
 
@@ -62,7 +70,8 @@ public class ProductService {
                     .distinct()
                     .collect(java.util.stream.Collectors.toList());
 
-            log.info("Search Coverage Result: Base({}) -> Total Unique({})", keyword, uniquePool.size());
+            double improvementFactor = baseKeywordCount > 0 ? (double) uniquePool.size() / baseKeywordCount * 100 : 100;
+            log.info("[v16-PROVE] TOTAL Expanded Unique Results: {} (Coverage: {}%)", uniquePool.size(), String.format("%.1f", improvementFactor));
 
             // 4. 정렬 적용
             if (sort != null && sort.contains("price_")) {
