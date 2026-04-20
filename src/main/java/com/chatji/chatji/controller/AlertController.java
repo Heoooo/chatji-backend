@@ -2,6 +2,7 @@ package com.chatji.chatji.controller;
 
 import com.chatji.chatji.domain.alert.Alert;
 import com.chatji.chatji.domain.alert.AlertRepository;
+import com.chatji.chatji.service.AlertService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
