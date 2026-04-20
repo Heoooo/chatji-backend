@@ -18,8 +18,7 @@ public class NaverShoppingProperties {
     @PostConstruct
     public void debugConfig() {
         if (clientId == null || clientId.isBlank() || clientId.contains("YOUR_CLIENT_ID")) {
-            log.error("[AUTH-ERROR] Naver Client ID is EMPTY or INVALID! 
-                     Current ID: [{}] - Please check Render Environment Variables or application-secret.yml", clientId);
+            log.error("[AUTH-ERROR] Naver Client ID is EMPTY or INVALID! Current: [{}] - Please check Environment Variables.", clientId);
         } else {
             // v30.5: 안전한 로깅 (글자 수 체크)
             String maskedId = (clientId.length() > 3) ? clientId.substring(0, 3) + "***" : "ID_TOO_SHORT";
