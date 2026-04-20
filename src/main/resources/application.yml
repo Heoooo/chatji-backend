@@ -15,7 +15,9 @@ spring:
 naver:
   openapi:
     url: https://openapi.naver.com/v1/search/shop.json
-    # 클라이언트 ID/Secret은 application-secret.yml에서 가져옵니다.
+    # v30.4: 환경 변수가 있으면 그것을 사용하고, 없으면 application-secret.yml을 참조합니다.
+    client-id: ${NAVER_CLIENT_ID:}
+    client-secret: ${NAVER_CLIENT_SECRET:}
 
 resilience4j:
   circuitbreaker:
