@@ -28,11 +28,12 @@ public class HotDealCrawlerService {
     private final PriceHistoryRepository priceHistoryRepository;
     private final ProductService productService;
     private final AlarmService alarmService;
+    private final AlertService alertService; // v30: 알림 감시 서비스
 
     @Scheduled(fixedDelay = 300000, initialDelay = 1000)
     @Transactional
     public void crawlAllHotDeals() {
-        log.info("[v28-CRAWLER] Intelligence Engine Active (Categorization & History)");
+        log.info("[v30-CRAWLER] Intelligence Engine Active (Alert Surveillance)");
         crawlPomppu();
         crawlRuliweb();
     }
@@ -44,7 +45,7 @@ public class HotDealCrawlerService {
             Elements rows = doc.select("tr.list0, tr.list1");
             processRows(rows, "뽐뿌", "no=");
         } catch (Exception e) {
-            log.error("[v28] Pomppu Error: {}", e.getMessage());
+            log.error("[v30] Pomppu Error: {}", e.getMessage());
         }
     }
 
@@ -67,7 +68,7 @@ public class HotDealCrawlerService {
                 } catch (Exception e) { continue; }
             }
         } catch (Exception e) {
-            log.error("[v28] Ruliweb Error: {}", e.getMessage());
+            log.error("[v30] Ruliweb Error: {}", e.getMessage());
         }
     }
 
@@ -101,13 +102,13 @@ public class HotDealCrawlerService {
         
         int discountRate = 0;
         int score = 50; 
-        String category = "기타"; // v28: 기본 카테고리 설정
+        String category = "기타";
 
         if (!naverResults.isEmpty()) {
             ProductService.ProductResponse bestMatch = naverResults.get(0);
             int naverLowestPrice = bestMatch.lprice();
             discountRate = (int) (((double)(naverLowestPrice - dealPrice) / naverLowestPrice) * 100);
-            category = bestMatch.category(); // v28: 검색 결과에서 카테고리 추출
+            category = bestMatch.category();
 
             priceHistoryRepository.save(PriceHistory.builder()
                     .productId(bestMatch.productId())
@@ -115,6 +116,9 @@ public class HotDealCrawlerService {
                     .keyword(keyword)
                     .timestamp(LocalDateTime.now())
                     .build());
+
+            // v30: 시세 추적 알림 체크 (목표가 도달 여부)
+            alertService.checkTargetPriceAlerts(bestMatch.productId(), dealPrice, title, link);
 
             score = Math.min(100, Math.max(0, 50 + (discountRate * 2)));
         }
@@ -127,10 +131,14 @@ public class HotDealCrawlerService {
                     .currentPrice(dealPrice)
                     .source(source)
                     .score(score)
-                    .category(category) // v28: 카테고리 정보와 함께 저장
+                    .category(category)
                     .build();
 
             hotDealRepository.save(newDeal);
+            
+            // v30: 개인화 키워드 알림 체크
+            alertService.checkKeywordAlerts(newDeal);
+
             alarmService.sendHotDealAlarm(newDeal, discountRate);
         }
     }

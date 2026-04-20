@@ -2,14 +2,13 @@ package com.chatji.chatji.controller;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @RestController
@@ -17,44 +16,59 @@ import java.util.concurrent.CopyOnWriteArrayList;
 @CrossOrigin(origins = "*")
 public class NotificationController {
 
-    // 연결된 모든 브라우저(컴퓨터)의 리스트
-    private static final CopyOnWriteArrayList<SseEmitter> emitters = new CopyOnWriteArrayList<>();
+    private static final Map<String, SseEmitter> userEmitters = new ConcurrentHashMap<>();
 
-    /**
-     * v29: 브라우저와 실시간 알림 파이프라인 연결
-     */
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter stream() {
-        SseEmitter emitter = new SseEmitter(60 * 1000L * 60); // 1시간 연결 유지
-        emitters.add(emitter);
+    public SseEmitter stream(@RequestParam String userId) {
+        SseEmitter emitter = new SseEmitter(60 * 1000L * 60); 
+        userEmitters.put(userId, emitter);
 
-        emitter.onCompletion(() -> emitters.remove(emitter));
-        emitter.onTimeout(() -> emitters.remove(emitter));
-        emitter.onError((e) -> emitters.remove(emitter));
+        emitter.onCompletion(() -> userEmitters.remove(userId));
+        emitter.onTimeout(() -> userEmitters.remove(userId));
+        emitter.onError((e) -> userEmitters.remove(userId));
 
         try {
-            // 연결 성공 시 첫 메시지 (Handshake)
             emitter.send(SseEmitter.event()
                     .name("connect")
-                    .data("Connected to Chatji Real-time Network"));
+                    .data("Connected for: " + userId));
         } catch (IOException e) {
-            emitters.remove(emitter);
+            userEmitters.remove(userId);
         }
 
         return emitter;
     }
 
     /**
-     * 모든 유저에게 대형 알림 전송 (AlarmService에서 호출)
+     * v30.1: 실시간 연결 유지를 위한 하트비트 (30초마다 전송)
      */
-    public static void broadcast(String name, Object data) {
-        for (SseEmitter emitter : emitters) {
+    @Scheduled(fixedDelay = 30000)
+    public void sendHeartbeat() {
+        userEmitters.forEach((id, emitter) -> {
             try {
-                emitter.send(SseEmitter.event()
-                        .name(name)
-                        .data(data));
+                emitter.send(SseEmitter.event().name("heartbeat").data("ping"));
             } catch (IOException e) {
-                emitters.remove(emitter);
+                userEmitters.remove(id);
+            }
+        });
+    }
+
+    public static void broadcast(String name, Object data) {
+        userEmitters.forEach((id, emitter) -> {
+            try {
+                emitter.send(SseEmitter.event().name(name).data(data));
+            } catch (IOException e) {
+                userEmitters.remove(id);
+            }
+        });
+    }
+
+    public static void sendToUser(String userId, String name, Object data) {
+        SseEmitter emitter = userEmitters.get(userId);
+        if (emitter != null) {
+            try {
+                emitter.send(SseEmitter.event().name(name).data(data));
+            } catch (IOException e) {
+                userEmitters.remove(userId);
             }
         }
     }
