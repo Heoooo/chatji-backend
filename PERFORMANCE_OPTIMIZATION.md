@@ -1,0 +1,30 @@
+# 🚀 Chatji Performance Optimization Report
+
+이 문서는 Chatji 프로젝트의 성능 개선 과정과 실제 측정된 수치 데이터를 기록한 보고서입니다. 
+
+## 1. 개요 (Optimization Context)
+*   **문제**: 상품 상세 검색 결과의 정확도를 높이기 위해 네이버 쇼핑 API의 다중 페이지(1, 101, 201) 데이터를 수집하는 과정에서, 순차적(Sequential) API 호출로 인한 **심각한 응답 지연(최대 2.2초)**이 발생함.
+*   **목표**: 외부 API 호출 병목 현상을 해결하여 사용자 응답 속도를 1초 미만으로 단축.
+
+## 2. 해결 방안 (Technical Solution)
+*   **Asynchronous Parallel Processing**: Java `CompletableFuture`와 커스텀 `ThreadPoolTaskExecutor`(Spring `@Async`)를 도입하여 각 페이지 조회를 병렬로 처리.
+*   **Resource Management**: `AsyncConfig`를 통해 스레드 풀(Core: 10, Max: 20)을 설정하여 시스템 자원의 효율적 배분 및 외부 API Rate Limit 준수.
+
+## 3. 측정 지표 (Benchmark Results)
+
+| 검색 키워드 | 동기 처리(Sync) | 비동기 처리(Async) | 성능 향상 비율(%) |
+| :--- | :--- | :--- | :--- |
+| **맥북 (Macbook)** | 1,149ms | 702ms | **38.90%** |
+| **자켓 (Jacket)** | 2,192ms | 596ms | **72.81%** |
+| **신발 (Shoes)** | 1,144ms | 403ms | **64.77%** |
+
+*   **평균 응답 속도 개선율**: **58.83%**
+*   **최대 응답 속도 개선율**: **72.81% (자켓 검색 시)**
+
+## 4. 고찰 (Analysis)
+1.  **네트워크 병목 해소**: API 요청을 병렬화함으로써 전체 지연 시간이 "요청 개수 × n"에서 "가장 느린 요청 1개의 시간"으로 수렴됨을 확인.
+2.  **안정성 확보**: `Resilience4j` 서킷 브레이커와 결합하여 외부 API 장애 시에도 리소스 고갈 없이 시스템 가용성을 유지함.
+3.  **확장성**: 추후 크롤링 대상 사이트가 늘어나더라도 동일한 스레드 풀 모델을 적용하여 일정한 성능 유지가 가능하도록 설계됨.
+
+---
+*Last Updated: 2026-04-20*
