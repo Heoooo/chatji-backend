@@ -58,7 +58,23 @@ public class AlertService {
 
     private void matchAndSend(Alert alert, HotDeal deal) {
         boolean isMatch = false;
-        // (기본 매칭 로직 유지 - addAlertAndCheckImmediately에서 사용 중)
+
+        if (alert.getType() == Alert.AlertType.KEYWORD && alert.getKeyword() != null) {
+            if (deal.getTitle().toLowerCase().contains(alert.getKeyword().toLowerCase())) {
+                isMatch = true;
+            }
+        } else if (alert.getType() == Alert.AlertType.CATEGORY) {
+            if (alert.getCategorySmall() != null && alert.getCategorySmall().equals(deal.getCategorySmall())) {
+                isMatch = true;
+            } else if (alert.getCategorySmall() == null && alert.getCategoryLarge() != null && alert.getCategoryLarge().equals(deal.getCategoryLarge())) {
+                isMatch = true;
+            }
+        }
+
+        if (isMatch) {
+            NotificationController.sendToUser(alert.getUserId(), "hotdeal_match", deal);
+        }
+    }
 
     /**
      * v30: 특정 상품의 목표가 도달 여부 체크 (시세 변동 시)

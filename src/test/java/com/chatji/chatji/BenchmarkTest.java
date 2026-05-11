@@ -1,57 +1,50 @@
-package com.chatji.chatji.controller;
+package com.chatji.chatji;
 
 import com.chatji.chatji.domain.alert.Alert;
 import com.chatji.chatji.domain.alert.AlertRepository;
 import com.chatji.chatji.domain.hotdeal.HotDeal;
-import com.chatji.chatji.service.AlertService;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 
-@Slf4j
-@RestController
-@RequiredArgsConstructor
-@RequestMapping("/api/performance")
-public class PerformanceController {
+@SpringBootTest
+@ActiveProfiles("local")
+public class BenchmarkTest {
 
-    private final AlertRepository alertRepository;
-    private final AlertService alertService;
+    @Autowired
+    private AlertRepository alertRepository;
 
-    @GetMapping("/test-alert-matching")
-    public String runBenchmark() {
+    @Test
+    public void runAlertMatchingBenchmark() {
         int testCount = 10000;
-        log.info("[BENCHMARK] Generating {} dummy alerts...", testCount);
-        
-        // 1. 더미 데이터 생성 (기존 데이터 삭제 후 진행)
+        System.out.println("Starting Benchmark with " + testCount + " alerts...");
+
+        // 1. 데이터 준비
         alertRepository.deleteAll();
         List<Alert> dummyAlerts = new ArrayList<>();
         for (int i = 0; i < testCount; i++) {
             dummyAlerts.add(Alert.builder()
                     .userId("user_" + i)
                     .type(i % 2 == 0 ? Alert.AlertType.KEYWORD : Alert.AlertType.CATEGORY)
-                    .keyword(i % 2 == 0 ? "맥북" + i : null)
+                    .keyword(i % 2 == 0 ? "맥북" + (i % 100) : null) // 100종류의 키워드 반복
                     .categoryLarge(i % 2 != 0 ? "가전" : null)
                     .categorySmall(i % 2 != 0 ? "노트북" : null)
                     .active(true)
                     .build());
         }
         alertRepository.saveAll(dummyAlerts);
-        log.info("[BENCHMARK] Data generation complete.");
 
-        // 테스트용 핫딜
         HotDeal testDeal = HotDeal.builder()
-                .title("대박 할인 맥북 에어 M3 실버")
+                .title("애플 2024 맥북 에어 M3 실버 13인치 특가")
                 .categoryLarge("가전")
                 .categorySmall("노트북")
                 .build();
 
-        // 2. 기존 방식 측정 (Loop)
+        // 2. 기존 방식 (Memory Loop)
         long startOld = System.nanoTime();
         List<Alert> all = alertRepository.findAllByActiveTrue();
         int matchCountOld = 0;
@@ -65,7 +58,7 @@ public class PerformanceController {
         long endOld = System.nanoTime();
         double timeOld = (endOld - startOld) / 1_000_000.0;
 
-        // 3. 최적화 방식 측정 (DB Query)
+        // 3. 최적화 방식 (DB Query)
         long startNew = System.nanoTime();
         List<Alert> matchedNew = alertRepository.findMatchingAlerts(
                 testDeal.getTitle(), testDeal.getCategoryLarge(), testDeal.getCategorySmall()
@@ -75,17 +68,13 @@ public class PerformanceController {
 
         double improvement = ((timeOld - timeNew) / timeOld) * 100;
 
-        String report = String.format(
-            "=== Alert Matching Benchmark Report ===\n" +
-            "Data Size: %d alerts\n" +
-            "Old Method (Loop): %.2f ms\n" +
-            "New Method (Query): %.2f ms\n" +
-            "Improvement: %.2f%%\n" +
-            "Status: %s",
-            testCount, timeOld, timeNew, improvement, (timeNew < timeOld ? "SUCCESS" : "FAIL")
-        );
-
-        log.info("\n" + report);
-        return report;
+        System.out.println("\n" + "=".repeat(40));
+        System.out.println("   BENCHMARK RESULT (10,000 Alerts)");
+        System.out.println("=".repeat(40));
+        System.out.printf("Old Method (Loop):   %.2f ms\n", timeOld);
+        System.out.printf("New Method (Query):  %.2f ms\n", timeNew);
+        System.out.printf("Improvement:         %.2f%%\n", improvement);
+        System.out.printf("Matched Users:       %d\n", matchedNew.size());
+        System.out.println("=".repeat(40));
     }
 }
