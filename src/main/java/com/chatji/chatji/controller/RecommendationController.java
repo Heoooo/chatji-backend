@@ -50,7 +50,7 @@ public class RecommendationController {
 
         // 2. 해당 카테고리 중 점수가 높은 핫딜 추출
         return hotDealRepository.findAll().stream()
-                .filter(deal -> deal.getCategory() != null && topCategories.contains(deal.getCategory()))
+                .filter(deal -> deal.getCategoryLarge() != null && topCategories.contains(deal.getCategoryLarge()))
                 .sorted((a, b) -> (b.getScore() != null ? b.getScore() : 0) - (a.getScore() != null ? a.getScore() : 0))
                 .limit(10)
                 .toList();

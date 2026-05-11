@@ -102,13 +102,15 @@ public class HotDealCrawlerService {
         
         int discountRate = 0;
         int score = 50; 
-        String category = "기타";
+        String catLarge = "기타";
+        String catSmall = "미분류";
 
         if (!naverResults.isEmpty()) {
             ProductService.ProductResponse bestMatch = naverResults.get(0);
             int naverLowestPrice = bestMatch.lprice();
             discountRate = (int) (((double)(naverLowestPrice - dealPrice) / naverLowestPrice) * 100);
-            category = bestMatch.category();
+            catLarge = bestMatch.categoryLarge();
+            catSmall = bestMatch.categorySmall();
 
             priceHistoryRepository.save(PriceHistory.builder()
                     .productId(bestMatch.productId())
@@ -131,13 +133,14 @@ public class HotDealCrawlerService {
                     .currentPrice(dealPrice)
                     .source(source)
                     .score(score)
-                    .category(category)
+                    .categoryLarge(catLarge)
+                    .categorySmall(catSmall)
                     .build();
 
             hotDealRepository.save(newDeal);
             
-            // v30: 개인화 키워드 알림 체크
-            alertService.checkKeywordAlerts(newDeal);
+            // v30: 개인화 알림 체크 (키워드 및 카테고리 통합)
+            alertService.checkNewHotDealAlerts(newDeal);
 
             alarmService.sendHotDealAlarm(newDeal, discountRate);
         }

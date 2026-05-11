@@ -24,7 +24,8 @@ public class HotDeal {
     private String mallName;
     private String source; // 뿜뿌, 루리웹 등 출처
     private Integer score; // v27: 핫딜 점수 (0-100)
-    private String category; // v28: 개인화 추천을 위한 카테고리 정보
+    private String categoryLarge; // 대분류 (예: 가전, 식품)
+    private String categorySmall; // 소분류 (예: 노트북, 생수)
     
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
